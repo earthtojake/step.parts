@@ -1,0 +1,179 @@
+{
+  "version": 1,
+  "scope": "Guardrails for rigid, repeatable catalog families only. Flexible brand, product, and one-off families intentionally do not need entries here.",
+  "rigidFamilies": {
+    "socket-head-cap-screw": {
+      "category": "fastener",
+      "description": "Metric hex socket head cap screws, typically standardized by ISO 4762 or an equivalent standard.",
+      "requiredTags": ["screw", "socket-head", "metric"],
+      "requiredAttributes": ["thread", "lengthMm", "nominalSize", "headStyle", "driveStyle"],
+      "identityFields": ["standard.designation", "attributes.thread", "attributes.lengthMm"]
+    },
+    "set-screw": {
+      "category": "fastener",
+      "description": "Metric set screws.",
+      "requiredTags": ["screw", "metric"],
+      "requiredAttributes": ["thread", "lengthMm", "nominalSize", "driveStyle"],
+      "identityFields": ["standard.designation", "attributes.thread", "attributes.lengthMm"]
+    },
+    "countersunk-screw": {
+      "category": "fastener",
+      "description": "Metric countersunk screws.",
+      "requiredTags": ["screw", "countersunk", "metric"],
+      "requiredAttributes": ["thread", "lengthMm", "nominalSize", "headStyle", "driveStyle"],
+      "identityFields": ["standard.designation", "attributes.thread", "attributes.lengthMm"]
+    },
+    "button-head-screw": {
+      "category": "fastener",
+      "description": "Metric button head screws.",
+      "requiredTags": ["screw", "button-head", "metric"],
+      "requiredAttributes": ["thread", "lengthMm", "nominalSize", "headStyle", "driveStyle"],
+      "identityFields": ["standard.designation", "attributes.thread", "attributes.lengthMm"]
+    },
+    "hex-nut": {
+      "category": "fastener",
+      "description": "Metric hex nuts.",
+      "requiredTags": ["nut", "hex", "metric"],
+      "requiredAttributes": ["thread", "nominalSize", "nutStyle"],
+      "identityFields": ["standard.designation", "attributes.thread"]
+    },
+    "flat-washer": {
+      "category": "fastener",
+      "description": "Metric flat washers.",
+      "requiredTags": ["washer", "flat", "metric"],
+      "requiredAttributes": ["thread", "nominalSize", "washerStyle"],
+      "identityFields": ["standard.designation", "attributes.thread"]
+    },
+    "large-washer": {
+      "category": "fastener",
+      "description": "Metric large-series washers.",
+      "requiredTags": ["washer", "large", "metric"],
+      "requiredAttributes": ["thread", "nominalSize", "washerStyle"],
+      "identityFields": ["standard.designation", "attributes.thread"]
+    },
+    "spring-washer": {
+      "category": "fastener",
+      "description": "Metric spring washers.",
+      "requiredTags": ["washer", "spring", "metric"],
+      "requiredAttributes": ["thread", "nominalSize", "washerStyle"],
+      "identityFields": ["standard.designation", "attributes.thread"]
+    },
+    "tab-washer": {
+      "category": "fastener",
+      "description": "Metric tab washers.",
+      "requiredTags": ["washer", "tab", "metric"],
+      "requiredAttributes": ["thread", "nominalSize", "washerStyle"],
+      "identityFields": ["standard.designation", "attributes.thread"]
+    },
+    "retaining-ring": {
+      "category": "fastener",
+      "description": "Metric retaining rings or circlips.",
+      "requiredTags": ["circlip", "metric"],
+      "requiredAttributes": ["thread", "nominalSize", "ringStyle", "standardClass"],
+      "identityFields": ["standard.designation", "attributes.thread", "attributes.standardClass"]
+    },
+    "deep-groove-ball-bearing": {
+      "category": "bearing",
+      "description": "Deep groove ball bearings identified by bearing code or nominal size.",
+      "requiredTags": ["ball-bearing", "metric"],
+      "requiredAttributes": ["nominalSize"],
+      "identityFields": ["attributes.nominalSize"]
+    },
+    "flanged-ball-bearing": {
+      "category": "bearing",
+      "description": "Flanged ball bearings identified by bearing code or nominal size.",
+      "requiredTags": ["ball-bearing", "flanged", "metric"],
+      "requiredAttributes": ["nominalSize", "flanged"],
+      "identityFields": ["attributes.nominalSize"]
+    },
+    "linear-bearing": {
+      "category": "bearing",
+      "description": "Linear bearings identified by nominal bearing code.",
+      "requiredTags": ["linear-motion", "metric"],
+      "requiredAttributes": ["nominalSize"],
+      "identityFields": ["attributes.nominalSize"]
+    },
+    "bolt-clearance-hole": {
+      "category": "cad-helper",
+      "description": "Parametric metric clearance hole helper solids.",
+      "requiredTags": ["clearance-hole", "metric"],
+      "requiredAttributes": ["thread", "fitClass", "tolerancePosition", "nominalSize"],
+      "identityFields": ["attributes.thread", "attributes.fitClass", "attributes.tolerancePosition"]
+    },
+    "t-slot-extrusion": {
+      "category": "profile",
+      "description": "Aluminum T-slot extrusion profiles and cut lengths. Identity is intentionally not enforced because vendor-compatible variants may share nominal dimensions.",
+      "requiredTags": ["extrusion", "t-slot", "aluminum"],
+      "requiredAttributes": ["widthMm", "heightMm", "profileSeries", "slotSizeMm", "material"],
+      "identityFields": []
+    },
+    "angle-bar": {
+      "category": "stock",
+      "description": "Standard steel angle bar profiles.",
+      "requiredTags": ["extrusion", "steel"],
+      "requiredAttributes": ["material", "legLengthMm", "secondLegLengthMm", "thicknessMm", "angleStyle", "nominalSize"],
+      "identityFields": [
+        "standard.designation",
+        "attributes.legLengthMm",
+        "attributes.secondLegLengthMm",
+        "attributes.thicknessMm"
+      ]
+    },
+    "square-tube": {
+      "category": "stock",
+      "description": "Standard steel square hollow sections.",
+      "requiredTags": ["extrusion", "steel"],
+      "requiredAttributes": ["material", "widthMm", "heightMm", "wallThicknessMm", "nominalSize"],
+      "identityFields": ["standard.designation", "attributes.widthMm", "attributes.heightMm", "attributes.wallThicknessMm"]
+    },
+    "rectangular-tube": {
+      "category": "stock",
+      "description": "Standard steel rectangular hollow sections.",
+      "requiredTags": ["extrusion", "steel"],
+      "requiredAttributes": ["material", "widthMm", "heightMm", "wallThicknessMm", "nominalSize"],
+      "identityFields": ["standard.designation", "attributes.widthMm", "attributes.heightMm", "attributes.wallThicknessMm"]
+    },
+    "flat-bar": {
+      "category": "stock",
+      "description": "Standard steel flat bars.",
+      "requiredTags": ["extrusion", "steel"],
+      "requiredAttributes": ["material", "widthMm", "thicknessMm", "nominalSize"],
+      "identityFields": ["standard.designation", "attributes.widthMm", "attributes.thicknessMm"]
+    },
+    "round-bar": {
+      "category": "stock",
+      "description": "Standard steel round bars.",
+      "requiredTags": ["extrusion", "steel"],
+      "requiredAttributes": ["material", "nominalSize"],
+      "identityFields": ["standard.designation", "attributes.nominalSize"]
+    },
+    "square-bar": {
+      "category": "stock",
+      "description": "Standard steel square bars.",
+      "requiredTags": ["extrusion", "steel"],
+      "requiredAttributes": ["material", "widthMm", "heightMm", "nominalSize"],
+      "identityFields": ["standard.designation", "attributes.widthMm", "attributes.heightMm"]
+    },
+    "h-beam": {
+      "category": "stock",
+      "description": "Standard steel H-beam profiles.",
+      "requiredTags": ["extrusion", "steel"],
+      "requiredAttributes": ["material", "profileSeries", "nominalSize"],
+      "identityFields": ["standard.designation", "attributes.profileSeries"]
+    },
+    "ipe-profile": {
+      "category": "stock",
+      "description": "Standard steel IPE profiles.",
+      "requiredTags": ["extrusion", "i-beam", "steel"],
+      "requiredAttributes": ["material", "profileSeries", "nominalSize"],
+      "identityFields": ["standard.designation", "attributes.profileSeries"]
+    },
+    "hex-standoff": {
+      "category": "spacer",
+      "description": "Metric hex standoffs.",
+      "requiredTags": ["standoff", "hex", "metric"],
+      "requiredAttributes": ["thread", "lengthMm", "nominalSize", "shape", "gender"],
+      "identityFields": ["attributes.thread", "attributes.lengthMm", "attributes.gender"]
+    }
+  }
+}
