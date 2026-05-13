@@ -29,8 +29,8 @@ const FIELD_DEFINITIONS = {
   attributes: "Part-specific scalar facts. Keys are searchable through q and documented by family when available.",
   stepUrl:
     "URL for the canonical STEP asset in API records. Local/dev records resolve through /step/{id}.step backed by catalog/step; production records use commit-pinned GitHub LFS media URLs.",
-  glbUrl: "Absolute URL for the GLB preview asset in API records.",
-  pngUrl: "Absolute URL for the PNG thumbnail asset in API records.",
+  glbUrl: "Absolute Vercel Blob URL for the GLB preview asset in API records.",
+  pngUrl: "Absolute Vercel Blob URL for the PNG thumbnail asset in API records.",
   byteSize: "STEP file size in bytes.",
   sha256: "STEP file SHA-256 checksum.",
   pageUrl: "Absolute canonical HTML part page URL, present in API records.",
@@ -261,8 +261,8 @@ export function buildCatalogSchema() {
     productPage: { type: "string", format: "uri" },
     attributes: { $ref: "#/$defs/PartAttributes" },
     stepUrl: { type: "string" },
-    glbUrl: { type: "string" },
-    pngUrl: { type: "string" },
+    glbUrl: { type: "string", format: "uri", description: FIELD_DEFINITIONS.glbUrl },
+    pngUrl: { type: "string", format: "uri", description: FIELD_DEFINITIONS.pngUrl },
     byteSize: { type: ["number", "null"] },
     sha256: { type: ["string", "null"] },
   };
@@ -314,8 +314,8 @@ export function buildCatalogSchema() {
             description:
               "Canonical STEP asset URL. Local/dev resolves through /step/{id}.step; production uses a commit-pinned GitHub LFS media URL.",
           },
-          glbUrl: { type: "string", format: "uri" },
-          pngUrl: { type: "string", format: "uri" },
+          glbUrl: { type: "string", format: "uri", description: FIELD_DEFINITIONS.glbUrl },
+          pngUrl: { type: "string", format: "uri", description: FIELD_DEFINITIONS.pngUrl },
         },
       },
     },

@@ -37,8 +37,8 @@ API catalog records contain:
 - productPage: optional product page URL for the STEP file
 - attributes: part-specific scalar facts such as thread, lengthMm, bore1Mm, material, profileSeries, or slotSizeMm
 - stepUrl: URL for the canonical STEP file; local/dev resolves through /step/{id}.step and production uses a commit-pinned GitHub LFS media URL
-- glbUrl: absolute URL for the GLB preview
-- pngUrl: absolute URL for the PNG thumbnail
+- glbUrl: absolute Vercel Blob URL for the GLB preview
+- pngUrl: absolute Vercel Blob URL for the PNG thumbnail
 - byteSize: STEP file size in bytes
 - sha256: STEP file SHA-256 checksum
 
@@ -86,8 +86,8 @@ Examples:
 - Local/dev STEP file route: ${absoluteUrl("/step/{id}.step")}
 - Production STEP files: commit-pinned GitHub LFS media URLs exposed as stepUrl
 - Counted STEP download: ${apiUrl("/v1/parts/{id}/download")}
-- GLB preview: ${absoluteUrl("/glb/{id}.glb")}
-- PNG thumbnail: ${absoluteUrl("/png/{id}.png")}
+- GLB preview: use the absolute glbUrl returned by the API record
+- PNG thumbnail: use the absolute pngUrl returned by the API record
 
 ## Usage notes
 

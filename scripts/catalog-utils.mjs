@@ -19,7 +19,7 @@ export const stepDir = path.join(catalogDir, "step");
 export const glbDir = path.join(publicDir, "glb");
 export const pngDir = path.join(publicDir, "png");
 
-export const CATALOG_DB_USER_VERSION = 2;
+export const CATALOG_DB_USER_VERSION = 3;
 export const CATALOG_DB_BUSY_TIMEOUT_MS = 30_000;
 
 const PART_COLUMNS = [
@@ -41,12 +41,6 @@ const PART_COLUMNS = [
   "step_byte_size",
   "step_sha256",
   "step_geometry_sha256",
-  "glb_build_key",
-  "glb_byte_size",
-  "glb_sha256",
-  "png_build_key",
-  "png_byte_size",
-  "png_sha256",
 ];
 
 const CREATE_PARTS_SQL = `
@@ -78,14 +72,6 @@ CREATE TABLE IF NOT EXISTS parts (
   step_byte_size INTEGER NOT NULL CHECK (step_byte_size >= 0),
   step_sha256 TEXT NOT NULL CHECK (length(step_sha256) = 64),
   step_geometry_sha256 TEXT NOT NULL CHECK (length(step_geometry_sha256) = 64),
-
-  glb_build_key TEXT NOT NULL,
-  glb_byte_size INTEGER NOT NULL CHECK (glb_byte_size >= 0),
-  glb_sha256 TEXT NOT NULL CHECK (length(glb_sha256) = 64),
-
-  png_build_key TEXT NOT NULL,
-  png_byte_size INTEGER NOT NULL CHECK (png_byte_size >= 0),
-  png_sha256 TEXT NOT NULL CHECK (length(png_sha256) = 64),
 
   CHECK (
     (standard_body IS NULL) = (standard_number IS NULL)
@@ -306,7 +292,7 @@ export function partFromCatalogRow(row) {
   });
 }
 
-export function catalogRowFromPart(part, { sourceOrder, glbBuildKey, glb, pngBuildKey, png }) {
+export function catalogRowFromPart(part, { sourceOrder }) {
   const normalized = normalizePart(part);
 
   if (normalized.byteSize === null || normalized.sha256 === null || normalized.stepGeometrySha256 === null) {
@@ -332,12 +318,6 @@ export function catalogRowFromPart(part, { sourceOrder, glbBuildKey, glb, pngBui
     step_byte_size: normalized.byteSize,
     step_sha256: normalized.sha256,
     step_geometry_sha256: normalized.stepGeometrySha256,
-    glb_build_key: glbBuildKey,
-    glb_byte_size: glb.byteSize,
-    glb_sha256: glb.sha256,
-    png_build_key: pngBuildKey,
-    png_byte_size: png.byteSize,
-    png_sha256: png.sha256,
   };
 }
 
@@ -364,10 +344,7 @@ export function ensureCatalogDatabaseSchema(db) {
   }
 
   const row = db.prepare("PRAGMA user_version").get();
-  if (row.user_version === 1) {
-    db.exec("ALTER TABLE parts ADD COLUMN step_geometry_sha256 TEXT");
-    db.exec(`PRAGMA user_version = ${CATALOG_DB_USER_VERSION}`);
-  } else if (row.user_version !== CATALOG_DB_USER_VERSION) {
+  if (row.user_version !== CATALOG_DB_USER_VERSION) {
     throw new Error(`SQLite user_version must be ${CATALOG_DB_USER_VERSION}; found ${row.user_version}`);
   }
 
@@ -507,51 +484,4 @@ export async function readCatalogRowMapIfExists({ filePath = sqliteCatalogPath }
 
 export function readCatalogParts() {
   return readCatalogRows().map(partFromCatalogRow);
-}
-
-export function assetMatchesRow(reference, row, prefix) {
-  return Boolean(
-    reference &&
-      row &&
-      row[`${prefix}_byte_size`] === reference.byteSize &&
-      row[`${prefix}_sha256`] === reference.sha256,
-  );
-}
-
-export async function isGlbCurrent(row, part, buildKey) {
-  if (!row || row.glb_build_key !== buildKey) {
-    return false;
-  }
-
-  if (row.step_geometry_sha256 && row.step_geometry_sha256 !== part.stepGeometrySha256) {
-    return false;
-  }
-
-  return assetMatchesRow(await tryHashFile(glbPathFor(part)), row, "glb");
-}
-
-export async function isPngCurrent(row, part, buildKey) {
-  if (!row || row.png_build_key !== buildKey) {
-    return false;
-  }
-
-  const glb = await tryHashFile(glbPathFor(part));
-  if (!glb || row.glb_sha256 !== glb.sha256 || row.glb_byte_size !== glb.byteSize) {
-    return false;
-  }
-
-  return assetMatchesRow(await tryHashFile(pngPathFor(part)), row, "png");
-}
-
-export async function catalogRowFromCurrentAssets(part, sourceOrder, buildKeys) {
-  const glb = await hashFile(glbPathFor(part));
-  const png = await hashFile(pngPathFor(part));
-
-  return catalogRowFromPart(part, {
-    sourceOrder,
-    glbBuildKey: buildKeys.glb,
-    glb,
-    pngBuildKey: buildKeys.png,
-    png,
-  });
 }

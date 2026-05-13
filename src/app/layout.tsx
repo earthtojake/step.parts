@@ -6,15 +6,25 @@ import "./globals.css";
 
 const themeScript = `
 (() => {
+  const root = document.documentElement;
+  const systemTheme =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  let theme = systemTheme;
+
   try {
     const storedTheme = window.localStorage.getItem("step-parts-theme");
-    const theme = storedTheme === "dark" ? "dark" : "light";
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.style.colorScheme = theme;
+    if (storedTheme === "dark" || storedTheme === "light") {
+      theme = storedTheme;
+    }
   } catch {
-    document.documentElement.classList.remove("dark");
-    document.documentElement.style.colorScheme = "light";
+    // Fall back to the system theme when storage is unavailable.
   }
+
+  root.classList.toggle("dark", theme === "dark");
+  root.style.colorScheme = theme;
 })();
 `;
 

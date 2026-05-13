@@ -2,7 +2,7 @@
 
 ## Origins
 
-Default to the API origin `https://api.step.parts`. Use a different origin only when the user supplies another hosted step.parts-compatible API domain. Static HTML pages plus GLB and PNG preview assets live on `https://www.step.parts`; STEP URLs are environment-aware and production records use commit-pinned GitHub LFS media. If the API domain does not resolve, treat the hosted service as unavailable and ask for a deployed origin when a live download is required.
+Default to the API origin `https://api.step.parts`. Use a different origin only when the user supplies another hosted step.parts-compatible API domain. Static HTML pages live on `https://www.step.parts`; GLB and PNG preview URLs in API records point directly at Vercel Blob. STEP URLs are environment-aware and production records use commit-pinned GitHub LFS media. If the API domain does not resolve, treat the hosted service as unavailable and ask for a deployed origin when a live download is required.
 
 ## Machine Endpoints
 
@@ -59,8 +59,7 @@ Use returned URLs when possible. Patterns are:
 
 ```text
 https://www.step.parts/step/{id}.step
-https://www.step.parts/glb/{id}.glb
-https://www.step.parts/png/{id}.png
+Use the absolute `glbUrl` and `pngUrl` returned by the API record. Preview assets are served from Vercel Blob.
 https://www.step.parts/parts/{id}
 https://api.step.parts/v1/parts/{id}/download
 ```

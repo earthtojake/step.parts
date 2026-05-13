@@ -16,7 +16,7 @@ const { values } = parseArgs({
 });
 
 function printHelp() {
-  console.log(`Build catalog metadata and generated preview assets.
+  console.log(`Build local generated preview assets.
 
 Usage:
   npm run catalog:build
@@ -25,7 +25,7 @@ Usage:
   npm run catalog:build -- --targets-file /tmp/changed-steps.txt
 
 Options:
-  --force-build             Rebuild selected GLB/PNG assets even when they are up to date
+  --force-build             Accepted for compatibility; selected GLB/PNG assets are rebuilt
   --targets, --target, -t   Comma-separated or repeatable target files to build
   --targets-file            Read target files from a newline-delimited list
 `);

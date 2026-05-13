@@ -1,14 +1,15 @@
+import dns from "node:dns";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import sharp from "sharp";
-import { readAssetBuildKeys } from "./asset-build-metadata.mjs";
+import { parseArgs } from "node:util";
+import "./load-env.mjs";
+import { BLOB_ASSET_PREFIX, blobAssetPath } from "./blob-assets.mjs";
 import { checkStepMetadataForCatalogParts } from "./step-metadata.mjs";
 import {
   CATALOG_DB_USER_VERSION,
-  catalogRowFromCurrentAssets,
+  catalogRowFromPart,
   exists,
-  glbPathFor,
   looksLikeStep,
   materializePart,
   normalizeSourcePart,
@@ -17,7 +18,6 @@ import {
   obsoletePublicCatalogJsonPath,
   obsoletePublicCatalogSqlitePath,
   obsoleteSourceCatalogPath,
-  pngPathFor,
   readCatalogRows,
   sqliteCatalogPath,
   sourceCatalogPath,
@@ -25,6 +25,15 @@ import {
   stepDir,
   taxonomyPath,
 } from "./catalog-utils.mjs";
+
+dns.setDefaultResultOrder("ipv4first");
+
+const { values } = parseArgs({
+  allowPositionals: false,
+  options: {
+    "require-blob": { type: "boolean" },
+  },
+});
 
 const SOURCE_PART_KEYS = new Set([
   "id",
@@ -228,8 +237,6 @@ function validatePart(part, ids) {
   }
 
   assert(part.stepUrl === `/step/${part.id}.step`, `${part.id}: bad stepUrl`);
-  assert(part.glbUrl === `/glb/${part.id}.glb`, `${part.id}: bad glbUrl`);
-  assert(part.pngUrl === `/png/${part.id}.png`, `${part.id}: bad pngUrl`);
   assert(typeof part.byteSize === "number", `${part.id}: byteSize must be generated`);
   assert(/^[a-f0-9]{64}$/.test(part.sha256), `${part.id}: sha256 must be generated`);
 }
@@ -341,25 +348,67 @@ function validateTaxonomyIdentities(parts, taxonomy) {
   }
 }
 
-async function validateAssets(part) {
+async function validateStepAsset(part) {
   assert(await exists(stepPathFor(part)), `${part.id}: missing STEP file`);
-  assert(await exists(glbPathFor(part)), `${part.id}: missing GLB file`);
-  assert(await exists(pngPathFor(part)), `${part.id}: missing PNG file`);
 
   const step = await readFile(stepPathFor(part));
   assert(looksLikeStep(step), `${part.id}: STEP file does not look like a STEP file`);
+}
 
-  const glb = await readFile(glbPathFor(part));
-  assert(glb.byteLength >= 20, `${part.id}: GLB file is too small`);
-  assert(glb.readUInt32LE(0) === 0x46546c67, `${part.id}: GLB has bad magic`);
-  assert(glb.readUInt32LE(4) === 2, `${part.id}: GLB must be version 2`);
-  assert(glb.readUInt32LE(8) === glb.byteLength, `${part.id}: GLB length header mismatch`);
+async function readBlobAssetMapIfRequired(requireBlob) {
+  if (!requireBlob) {
+    return null;
+  }
 
-  const pngMetadata = await sharp(pngPathFor(part)).metadata();
-  assert(
-    pngMetadata.format === "png" && pngMetadata.width === 512 && pngMetadata.height === 512,
-    `${part.id}: PNG file must be 512x512`,
-  );
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error("BLOB_READ_WRITE_TOKEN is required for published Blob preview checks");
+  }
+
+  const { list } = await import("@vercel/blob");
+  const blobs = new Map();
+  let cursor;
+
+  do {
+    const page = await list({
+      prefix: `${BLOB_ASSET_PREFIX}/`,
+      limit: 1000,
+      cursor,
+    });
+
+    for (const blob of page.blobs) {
+      blobs.set(blob.pathname, blob);
+    }
+
+    cursor = page.cursor;
+    if (!page.hasMore) {
+      break;
+    }
+  } while (cursor);
+
+  return blobs;
+}
+
+function validateBlobPreviewAssets(partId, row, blobAssets) {
+  if (!blobAssets) {
+    return;
+  }
+
+  const expected = [
+    {
+      label: "GLB",
+      path: blobAssetPath("glb", partId, row.step_sha256),
+    },
+    {
+      label: "PNG",
+      path: blobAssetPath("png", partId, row.step_sha256),
+    },
+  ];
+
+  for (const asset of expected) {
+    const blob = blobAssets.get(asset.path);
+    assert(blob, `${partId}: missing Blob ${asset.label} preview asset ${asset.path}`);
+    assert(blob.size > 0, `${partId}: Blob ${asset.label} preview asset ${asset.path} is empty`);
+  }
 }
 
 async function assertPathMissing(filePath, message) {
@@ -401,7 +450,6 @@ async function collect(label, task) {
 
 const sourceParts = await readSourceParts();
 const taxonomy = await readTaxonomy();
-const buildKeys = await readAssetBuildKeys();
 const expectedParts = [];
 const sourceMetadataParts = [];
 
@@ -441,7 +489,7 @@ await collect("catalog/taxonomy.json identities", () => {
 
 for (const part of expectedParts) {
   await collect(part.id, async () => {
-    await validateAssets(part);
+    await validateStepAsset(part);
   });
 }
 
@@ -458,12 +506,15 @@ await collect("catalog/parts.sqlite rows", () => {
   assert(actualRows.size === expectedParts.length, `SQLite catalog has ${actualRows.size} rows; expected ${expectedParts.length}`);
 });
 
+const blobAssets = await readBlobAssetMapIfRequired(Boolean(values["require-blob"]));
+
 for (const [sourceOrder, part] of expectedParts.entries()) {
   await collect(`catalog/parts.sqlite:${part.id}`, async () => {
     const actual = actualRows.get(part.id);
     assert(actual, `${part.id}: missing SQLite row`);
-    const expected = await catalogRowFromCurrentAssets(part, sourceOrder, buildKeys);
+    const expected = catalogRowFromPart(part, { sourceOrder });
     assertRowsEqual(part.id, expected, actual);
+    validateBlobPreviewAssets(part.id, expected, blobAssets);
   });
 }
 
@@ -480,16 +531,16 @@ await collect("public/catalog/parts.ndjson", () =>
   assertPathMissing(obsoleteCatalogNdjsonPath, "public/catalog/parts.ndjson is obsolete; generated catalog metadata belongs in catalog/parts.sqlite"),
 );
 await collect("public/catalog/manifest.json", () =>
-  assertPathMissing(obsoleteAssetManifestPath, "public/catalog/manifest.json is obsolete; asset build state belongs in catalog/parts.sqlite"),
+  assertPathMissing(obsoleteAssetManifestPath, "public/catalog/manifest.json is obsolete; preview asset paths are derived from STEP SHA-256"),
 );
 await collect("catalog/manifest.json", () =>
-  assertPathMissing(path.join(process.cwd(), "catalog", "manifest.json"), "catalog/manifest.json is obsolete; asset build state belongs in catalog/parts.sqlite"),
+  assertPathMissing(path.join(process.cwd(), "catalog", "manifest.json"), "catalog/manifest.json is obsolete; preview asset paths are derived from STEP SHA-256"),
 );
 await collect("catalog/parts.source.json", () =>
   assertPathMissing(path.join(process.cwd(), "catalog", "parts.source.json"), "catalog/parts.source.json is obsolete; source catalog belongs in catalog/parts.json"),
 );
 await collect("public/parts", () =>
-  assertPathMissing(path.join(process.cwd(), "public", "parts"), "public/parts is obsolete; assets belong in catalog/step, public/glb, and public/png"),
+  assertPathMissing(path.join(process.cwd(), "public", "parts"), "public/parts is obsolete; canonical STEP assets belong in catalog/step and previews belong in Vercel Blob"),
 );
 await collect("public/step", () =>
   assertPathMissing(path.join(process.cwd(), "public", "step"), "public/step is obsolete; canonical STEP assets belong in catalog/step"),
@@ -500,4 +551,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`Checked ${expectedParts.length} catalog parts and generated assets.`);
+console.log(`Checked ${expectedParts.length} catalog parts and generated metadata${blobAssets ? "/Blob assets" : ""}.`);

@@ -498,6 +498,7 @@ async function main() {
     await writeSourceCatalogFile([...existingParts, sourcePart]);
     console.log(`Added ${id} to ${sourceCatalogPath}`);
 
+    await runNodeScript("scripts/generate-catalog.mjs");
     await runNodeScript("scripts/export-assets.mjs", ["--targets", id]);
     await runNodeScript("scripts/check-catalog.mjs");
   } finally {

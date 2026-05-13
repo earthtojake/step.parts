@@ -9,25 +9,6 @@ import { queryParts } from "@/lib/part-query";
 import { incrementPartDownload } from "@/lib/part-stats";
 import { getPart } from "@/lib/parts";
 
-const DOWNLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
-
-const DOWNLOAD_RATE_LIMITS = {
-  single: 120,
-} as const;
-const DOWNLOAD_RATE_LIMIT_CLEANUP_SIZE = 10_000;
-
-type DownloadRateLimitKind = keyof typeof DOWNLOAD_RATE_LIMITS;
-type DownloadRateLimitBucket = {
-  count: number;
-  resetAt: number;
-};
-
-const globalDownloadRateLimits = globalThis as typeof globalThis & {
-  __stepPartsDownloadRateLimits?: Map<string, DownloadRateLimitBucket>;
-};
-
-const downloadRateLimits = (globalDownloadRateLimits.__stepPartsDownloadRateLimits ??= new Map());
-
 function jsonError(message: string, status: number) {
   return apiJson({ error: message }, { status });
 }
@@ -42,50 +23,6 @@ function clientIdentifier(request: Request) {
 
 function rankingDedupeKey(request: Request) {
   return createHash("sha256").update(clientIdentifier(request)).digest("hex");
-}
-
-function downloadRateLimitResponse(resetAt: number) {
-  const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
-
-  return apiJson(
-    { error: "Too many download requests. Try again shortly." },
-    {
-      status: 429,
-      headers: {
-        "Retry-After": String(retryAfterSeconds),
-      },
-    },
-  );
-}
-
-function checkDownloadRateLimit(request: Request, kind: DownloadRateLimitKind) {
-  const now = Date.now();
-
-  if (downloadRateLimits.size > DOWNLOAD_RATE_LIMIT_CLEANUP_SIZE) {
-    for (const [key, bucket] of downloadRateLimits) {
-      if (bucket.resetAt <= now) {
-        downloadRateLimits.delete(key);
-      }
-    }
-  }
-
-  const key = `${kind}:${clientIdentifier(request)}`;
-  const current = downloadRateLimits.get(key);
-
-  if (!current || current.resetAt <= now) {
-    downloadRateLimits.set(key, {
-      count: 1,
-      resetAt: now + DOWNLOAD_RATE_LIMIT_WINDOW_MS,
-    });
-    return null;
-  }
-
-  if (current.count >= DOWNLOAD_RATE_LIMITS[kind]) {
-    return downloadRateLimitResponse(current.resetAt);
-  }
-
-  current.count += 1;
-  return null;
 }
 
 function responseBody(data: Uint8Array) {
@@ -146,11 +83,6 @@ export async function singlePartDownloadResponse(request: Request, partId: strin
 
   if (!part) {
     return jsonError("Part not found", 404);
-  }
-
-  const rateLimitResponse = checkDownloadRateLimit(request, "single");
-  if (rateLimitResponse) {
-    return rateLimitResponse;
   }
 
   await incrementPartDownload(part.id, rankingDedupeKey(request));

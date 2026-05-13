@@ -6,21 +6,15 @@ import { Worker, isMainThread, parentPort, workerData } from "node:worker_thread
 import { chromium } from "playwright";
 import sharp from "sharp";
 import occtImport from "occt-import-js";
-import { readAssetBuildKeys } from "./asset-build-metadata.mjs";
 import {
   ensureStepMetadataForCatalogParts,
   writeStepMetadataReport,
 } from "./step-metadata.mjs";
 import {
-  catalogRowFromCurrentAssets,
   ensureAssetDirs,
   glbPathFor,
-  isGlbCurrent,
-  isPngCurrent,
   materializePart,
-  openCatalogRowWriter,
   pngPathFor,
-  readCatalogRowMapIfExists,
   readSourceParts,
   stepPathFor,
   stepDir,
@@ -77,13 +71,13 @@ Usage:
   node scripts/export-assets.mjs --targets @/tmp/changed-steps.txt
 
 Options:
-  --force-build             Rebuild selected GLB/PNG assets even when they are up to date
+  --force-build             Accepted for compatibility; selected GLB/PNG assets are rebuilt
   --targets, --target, -t   Comma-separated or repeatable target files to build
   --targets-file            Read target files from a newline-delimited list
 
 Targets can be generated GLB/PNG paths, STEP/STP paths, bare filenames, or part ids.
 Target list files support one target per line; blank lines and lines starting with # are ignored.
-Targeting any artifact selects the owning part and processes its GLB/PNG pair before updating SQLite.
+Targeting any artifact selects the owning part and rebuilds its local GLB/PNG pair.
 `);
 }
 
@@ -927,83 +921,30 @@ function createExportStats() {
   return {
     completed: 0,
     glbBuilt: 0,
-    glbSkipped: 0,
     pngBuilt: 0,
-    pngSkipped: 0,
-    rowsUpserted: 0,
     failures: [],
   };
 }
 
-async function planEntryWork(entries, existingRows, buildKeys, forceBuild) {
-  if (forceBuild) {
-    return entries.map((entry) => ({
-      entry,
-      glbCurrent: false,
-      pngCurrent: false,
-    }));
-  }
-
-  return await Promise.all(
-    entries.map(async (entry) => {
-      const existingRow = existingRows.get(entry.part.id);
-      const glbCurrent = await isGlbCurrent(existingRow, entry.part, buildKeys.glb);
-      const pngCurrent = glbCurrent && (await isPngCurrent(existingRow, entry.part, buildKeys.png));
-
-      return {
-        entry,
-        glbCurrent,
-        pngCurrent,
-      };
-    }),
-  );
-}
-
-async function upsertCurrentEntries(workItems, writer, buildKeys, stats, total) {
-  for (const { entry } of workItems) {
-    writer.upsert(await catalogRowFromCurrentAssets(entry.part, entry.sourceOrder, buildKeys));
-    stats.glbSkipped += 1;
-    stats.pngSkipped += 1;
-    stats.rowsUpserted += 1;
-    stats.completed += 1;
-    console.log(`${stats.completed}/${total} ${entry.part.id} complete`);
-  }
-}
-
-async function processCatalogEntry({ lane, workItem, buildKeys, writer, stats, total }) {
+async function processCatalogEntry({ lane, workItem, stats, total }) {
   const { entry } = workItem;
-  const { part, sourceOrder } = entry;
+  const { part } = entry;
   let stage = "GLB";
 
   try {
-    if (workItem.glbCurrent) {
-      stats.glbSkipped += 1;
-    } else {
-      const result = await lane.glb.export(part);
-      if (result.skipped) {
-        throw new Error(result.reason ?? "GLB export failed");
-      }
-      stats.glbBuilt += 1;
+    const result = await lane.glb.export(part);
+    if (result.skipped) {
+      throw new Error(result.reason ?? "GLB export failed");
     }
+    stats.glbBuilt += 1;
 
     stage = "PNG";
-    if (workItem.pngCurrent) {
-      stats.pngSkipped += 1;
-    } else {
-      await writeFileAtomic(pngPathFor(part), await lane.renderer.render(part));
-      stats.pngBuilt += 1;
-    }
+    await writeFileAtomic(pngPathFor(part), await lane.renderer.render(part));
+    stats.pngBuilt += 1;
 
-    stage = "SQLite";
-    writer.upsert(await catalogRowFromCurrentAssets(part, sourceOrder, buildKeys));
-    stats.rowsUpserted += 1;
     stats.completed += 1;
     console.log(`${stats.completed}/${total} ${part.id} complete`);
   } catch (error) {
-    if (stage === "SQLite") {
-      throw error;
-    }
-
     stats.completed += 1;
     stats.failures.push({
       partId: part.id,
@@ -1097,9 +1038,6 @@ async function main() {
     })),
   );
   const parts = entries.map((entry) => entry.part);
-  const forceBuild = Boolean(values["force-build"]);
-  const buildKeys = await readAssetBuildKeys();
-  const existingRows = await readCatalogRowMapIfExists();
   const targetSelection = await resolveTargetSelection(parts);
   const selectedEntries = targetSelection.hasTargets
     ? entries.filter((entry) => targetSelection.ids.has(entry.part.id))
@@ -1112,28 +1050,13 @@ async function main() {
     console.log(`Catalog build: checking ${formatCount(selectedEntries.length, "part")}.`);
   }
 
-  const writer = openCatalogRowWriter();
   const stats = createExportStats();
-  let deletedRows = 0;
-  try {
-    const workItems = await planEntryWork(selectedEntries, existingRows, buildKeys, forceBuild);
-    const currentItems = workItems.filter((item) => item.glbCurrent && item.pngCurrent);
-    const buildItems = workItems.filter((item) => !item.glbCurrent || !item.pngCurrent);
+  const workItems = selectedEntries.map((entry) => ({ entry }));
 
-    await upsertCurrentEntries(currentItems, writer, buildKeys, stats, selectedEntries.length);
-    await exportPairs(buildItems, concurrency, {
-      buildKeys,
-      writer,
-      stats,
-      total: selectedEntries.length,
-    });
-
-    if (!targetSelection.hasTargets) {
-      deletedRows = writer.deleteRowsNotIn(parts.map((part) => part.id));
-    }
-  } finally {
-    writer.close();
-  }
+  await exportPairs(workItems, concurrency, {
+    stats,
+    total: selectedEntries.length,
+  });
 
   if (stats.failures.length > 0) {
     console.warn(
@@ -1143,18 +1066,11 @@ async function main() {
     );
   }
 
-  if (deletedRows > 0) {
-    console.log(`Removed ${formatCount(deletedRows, "stale SQLite row")} for source-catalog entries that no longer exist.`);
-  }
-
   console.log(
     `Asset build complete: ${formatCount(stats.glbBuilt, "GLB")} built, ${formatCount(
-      stats.glbSkipped,
-      "GLB",
-    )} skipped; ${formatCount(stats.pngBuilt, "PNG")} built, ${formatCount(stats.pngSkipped, "PNG")} skipped; ${formatCount(
-      stats.rowsUpserted,
-      "SQLite row",
-    )} upserted; ${formatCount(stats.failures.length, "part")} failed.`,
+      stats.pngBuilt,
+      "PNG",
+    )} built; ${formatCount(stats.failures.length, "part")} failed.`,
   );
 
   if (stats.failures.length > 0) {

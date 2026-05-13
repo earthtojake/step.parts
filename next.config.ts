@@ -46,14 +46,6 @@ const nextConfig: NextConfig = {
         source: "/step/:path*",
         headers: corsHeaders,
       },
-      {
-        source: "/glb/:path*",
-        headers: corsHeaders,
-      },
-      {
-        source: "/png/:path*",
-        headers: corsHeaders,
-      },
     ];
   },
 };

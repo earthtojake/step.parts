@@ -13,15 +13,27 @@
   <a href="https://react.dev/"><img alt="React" src="https://img.shields.io/badge/React-19.2.4-149eca?logo=react&amp;logoColor=white"></a>
   <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&amp;logoColor=white"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
-  <a href="#catalog-and-assets"><img alt="Catalog" src="https://img.shields.io/badge/catalog-STEP%20%2B%20GLB%20%2B%20PNG-2f6f73"></a>
-  <a href="#git-lfs-and-vercel"><img alt="Assets" src="https://img.shields.io/badge/assets-Git%20LFS-f64935?logo=gitlfs&amp;logoColor=white"></a>
+  <a href="#catalog-and-assets"><img alt="Catalog" src="https://img.shields.io/badge/catalog-STEP%20%2B%20Blob%20previews-2f6f73"></a>
+  <a href="#preview-assets"><img alt="Assets" src="https://img.shields.io/badge/previews-Vercel%20Blob-000000"></a>
 </p>
 
 <p align="center">12,000+ open source STEP parts for your next CAD project</p>
 
-## 🧰 Add A Part
+## 🧱 Parts
 
-Use the add-part helper instead of editing generated catalog fields by hand:
+step.parts is a searchable directory of open-source STEP models for parts you can drop into CAD assemblies, robot builds, electronics layouts, and mechanical prototypes. Each catalog entry pairs a canonical STEP file with human-authored metadata and generated preview assets.
+
+You can find components such as:
+
+- **🔩 Fasteners and hardware:** screws, nuts, washers, pins, spacers, standoffs, and threaded parts
+- **📐 Stock and structural parts:** extrusion profiles, plates, brackets, helper geometry, and enclosure pieces
+- **⚙️ Motion and power transmission parts:** bearings, gears, pulleys, shafts, belts, and linear-motion components
+- **🔌 Electronics and thermal parts:** development boards, modules, connectors, sensors, heatsinks, and fans
+- **🤖 Actuators and robotics parts:** servos, motors, robot actuators, gear reducers, and related mounting hardware
+
+## 🧰 Contributions
+
+Use the add-part helper to add STEP files to the catalog:
 
 ```bash
 npm run catalog:add
@@ -57,8 +69,8 @@ Review and commit:
 
 - the new source entry in `catalog/parts.json`
 - the canonical STEP file in `catalog/step/`
-- generated GLB and PNG assets in `public/glb/` and `public/png/`
 - regenerated SQLite catalog in `catalog/parts.sqlite`
+- deterministic GLB and PNG preview URLs, uploaded by production `npm run catalog:sync-assets`
 
 ## 💻 Local Development
 
@@ -91,23 +103,22 @@ Reserve `stepSource` and `productPage` for branded products with official source
 See [`TAGGING.md`](TAGGING.md) before adding or reviewing tags. Catalog files live together under `catalog/`:
 
 - `catalog/parts.json`: human-authored source catalog
-- `catalog/parts.sqlite`: generated catalog metadata and asset build state consumed by the app
+- `catalog/parts.sqlite`: generated catalog metadata consumed by the app
 - `catalog/taxonomy.json`: guardrails for rigid, repeatable families such as standardized fasteners, washers, bearings, stock, and helper geometry
 - `catalog/step/{id}.step`
-- `public/glb/{id}.glb`
-- `public/png/{id}.png`
+- local generated previews under `public/glb/` and `public/png/` are ignored by Git and published to Vercel Blob
 
 `catalog/taxonomy.json` is intentionally narrow. Use it when a family has predictable identity fields and required attributes, such as `thread` plus `lengthMm` for screws or profile dimensions for stock. Do not add flexible brand, product, or one-off families just to make the taxonomy exhaustive; use existing examples in `catalog/parts.json` and the SQLite search API for those.
 
-Generated catalog rows add stable asset URLs, STEP byte size, STEP SHA-256 checksum, and current GLB/PNG build hashes. For metadata-only changes, refresh SQLite without rebuilding preview assets:
+Generated catalog rows add stable asset URLs, STEP byte size, and STEP SHA-256 checksum. Refresh SQLite without rebuilding preview assets:
 
 ```bash
 node scripts/generate-catalog.mjs
 ```
 
-When STEP files or preview assets change, run the full catalog build. The build is incremental by default: each selected STEP part is processed as a GLB/PNG pair, and a complete SQLite row is written as soon as that pair is current. Existing GLB previews and PNG thumbnails are skipped when `catalog/parts.sqlite` has matching input hashes, output hashes, and build keys.
+When local preview assets need to be inspected or repaired, run the catalog asset build. Each selected STEP part is processed as a GLB/PNG pair, and SQLite is not modified.
 
-Use `STEP_PARTS_EXPORT_CONCURRENCY` to tune paired export lanes; it defaults to `2`. Use `--force-build` to rebuild selected pairs anyway, or `--targets` to build specific outputs:
+Use `STEP_PARTS_EXPORT_CONCURRENCY` to tune paired export lanes; it defaults to `2`. Use `--targets` to build specific outputs:
 
 ```bash
 npm run catalog:build -- --force-build
@@ -122,13 +133,25 @@ npm run catalog:build -- --targets-file /tmp/changed-steps.txt
 npm run catalog:build -- --targets @/tmp/changed-steps.txt
 ```
 
-Targeted builds use row-level SQLite upserts, so separate targeted build processes can safely update different part sets at the same time. Full metadata-only rewrites still belong to `node scripts/generate-catalog.mjs`.
+Full metadata rewrites belong to `node scripts/generate-catalog.mjs`.
 
 Verify that committed generated files and assets are current without rewriting anything:
 
 ```bash
 npm run catalog:check
 ```
+
+## Preview Assets
+
+The app serves GLB and PNG preview URLs directly from Vercel Blob. Local catalog builds still write generated previews to `public/glb/` and `public/png/`, but those directories are ignored and should not be committed.
+
+After rebuilding previews, publish them to Blob:
+
+```bash
+BLOB_READ_WRITE_TOKEN=... npm run catalog:sync-assets
+```
+
+The sync command uploads immutable public assets at `preview/glb/{id}-{stepSha256}.glb` and `preview/png/{id}-{stepSha256}.png`. Set `STEP_PARTS_BLOB_BASE_URL` in production to the printed `https://...public.blob.vercel-storage.com` origin so API records can return direct Blob URLs.
 
 ## 🧪 API
 
@@ -176,11 +199,11 @@ npm run check
 npm run hooks:install
 ```
 
-The pre-commit hook runs `npm run check:commit`, which verifies generated catalog/assets and linting without the slower production build. GitHub Actions runs the full `npm run check` gate on pull requests and pushes to `main`.
+The pre-commit hook runs `npm run check:commit`, which verifies generated catalog/assets and linting without the slower production build. GitHub Actions intentionally runs `npm run check:ci` on pull requests and pushes to `main`; that CI gate skips LFS hydration and STEP-content catalog validation.
 
 ## Git LFS And Vercel
 
-STEP/STP/GLB/PNG assets are tracked by Git LFS through `.gitattributes`. For Vercel deployments, enable Git LFS in the project Git settings and redeploy so the LFS objects are pulled into the deployment.
+STEP/STP assets in `catalog/step` are tracked by Git LFS through `.gitattributes`. GLB/PNG previews are Vercel Blob assets and are not committed. CI and Vercel deployments are configured not to download LFS objects for now, so full catalog validation and preview asset generation are manual/local operations.
 
 Canonical STEP files live in `catalog/step` so local development and catalog validation read the same files used to generate `catalog/parts.sqlite`. Production STEP URLs use GitHub LFS media instead of deployed static files. By default production uses `VERCEL_GIT_COMMIT_SHA`, falling back to `main`; set `STEP_PARTS_GITHUB_REF` to override the ref, and set `STEP_PARTS_GITHUB_REPOSITORY` or `STEP_PARTS_GITHUB_OWNER` plus `STEP_PARTS_GITHUB_REPO` to override the repository. Set `STEP_PARTS_STEP_ASSET_MODE=local` only for a production-like local run that should serve checked-out STEP files directly.
 

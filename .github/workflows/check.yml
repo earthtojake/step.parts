@@ -8,10 +8,12 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      STEP_PARTS_BLOB_BASE_URL: ${{ vars.STEP_PARTS_BLOB_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
 
       - uses: actions/setup-node@v4
         with:
@@ -19,4 +21,4 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run check
+      - run: npm run check:ci

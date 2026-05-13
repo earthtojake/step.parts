@@ -20,6 +20,10 @@
 # production
 /build
 
+# generated preview assets are published to Vercel Blob
+/public/glb/
+/public/png/
+
 # misc
 .DS_Store
 *.pem

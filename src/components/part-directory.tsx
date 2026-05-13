@@ -88,15 +88,6 @@ function isActive(values: string[], value: string) {
   return values.some((entry) => normalize(entry) === normalizedValue);
 }
 
-function localAssetPath(url: string) {
-  try {
-    const parsedUrl = new URL(url);
-    return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
-  } catch {
-    return url;
-  }
-}
-
 function formatPartCount(count: number) {
   return new Intl.NumberFormat("en-US").format(count);
 }
@@ -303,8 +294,8 @@ function PartCard({
 }) {
   const stepUrl = `/v1/parts/${part.id}/download`;
   const stepName = stepFileName(part.id);
-  const pngUrl = localAssetPath(part.pngUrl);
-  const glbUrl = localAssetPath(part.glbUrl);
+  const pngUrl = part.pngUrl;
+  const glbUrl = part.glbUrl;
   const [showOrbitPreview, setShowOrbitPreview] = useState(false);
   const [orbitPreviewReady, setOrbitPreviewReady] = useState(false);
   const [OrbitPreview, setOrbitPreview] = useState<OrbitPreviewComponent | null>(null);

@@ -182,14 +182,6 @@ function downloadOperation(pathPrefix: string) {
           },
         },
       },
-      "429": {
-        description: "Download request rate limit exceeded.",
-        content: {
-          "application/json": {
-            schema: { $ref: "#/components/schemas/Error" },
-          },
-        },
-      },
     },
   };
 }
@@ -339,8 +331,16 @@ export function buildOpenApiSpec() {
               description:
                 "Canonical STEP asset URL. Local/dev resolves through /step/{id}.step; production uses a commit-pinned GitHub LFS media URL.",
             },
-            glbUrl: { type: "string", format: "uri" },
-            pngUrl: { type: "string", format: "uri" },
+            glbUrl: {
+              type: "string",
+              format: "uri",
+              description: "Public Vercel Blob URL for the GLB preview asset.",
+            },
+            pngUrl: {
+              type: "string",
+              format: "uri",
+              description: "Public Vercel Blob URL for the PNG thumbnail asset.",
+            },
             byteSize: { type: ["number", "null"] },
             sha256: { type: ["string", "null"] },
             pageUrl: { type: "string", format: "uri" },
@@ -432,7 +432,11 @@ export function buildOpenApiSpec() {
                   standard: { type: ["string", "null"] },
                   tags: { type: "array", items: { type: "string" } },
                   aliases: { type: "array", items: { type: "string" } },
-                  pngUrl: { type: "string", format: "uri" },
+                  pngUrl: {
+                    type: "string",
+                    format: "uri",
+                    description: "Public Vercel Blob URL for the PNG thumbnail asset.",
+                  },
                   pageUrl: { type: "string", format: "uri" },
                   apiUrl: { type: "string", format: "uri" },
                   downloadUrl: { type: "string", format: "uri" },

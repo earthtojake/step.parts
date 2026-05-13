@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, statSync, type Stats } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { blobAssetUrl } from "@/lib/blob-assets";
 import { catalogDbPathCandidates, resolveCatalogDbPath } from "@/lib/catalog-path";
 import { stepUrlForId } from "@/lib/part-download";
 import type { Part } from "@/types/part";
@@ -24,12 +25,6 @@ export type CatalogDbRow = {
   step_byte_size: number;
   step_sha256: string;
   step_geometry_sha256: string;
-  glb_build_key: string;
-  glb_byte_size: number;
-  glb_sha256: string;
-  png_build_key: string;
-  png_byte_size: number;
-  png_sha256: string;
 };
 
 export type CatalogFileInfo = {
@@ -127,12 +122,12 @@ function getCatalogState() {
   return nextState;
 }
 
-export function glbUrlForId(id: string) {
-  return `/glb/${id}.glb`;
+export function glbUrlForRow(row: Pick<CatalogDbRow, "id" | "step_sha256">) {
+  return blobAssetUrl("glb", row.id, row.step_sha256);
 }
 
-export function pngUrlForId(id: string) {
-  return `/png/${id}.png`;
+export function pngUrlForRow(row: Pick<CatalogDbRow, "id" | "step_sha256">) {
+  return blobAssetUrl("png", row.id, row.step_sha256);
 }
 
 function parseJson<T>(value: string): T {
@@ -184,8 +179,8 @@ export function partFromCatalogRow(row: CatalogDbRow): Part {
     ...(row.product_page ? { productPage: row.product_page } : {}),
     attributes: parseJson<Part["attributes"]>(row.attributes_json),
     stepUrl: stepUrlForId(row.id),
-    glbUrl: glbUrlForId(row.id),
-    pngUrl: pngUrlForId(row.id),
+    glbUrl: glbUrlForRow(row),
+    pngUrl: pngUrlForRow(row),
     byteSize: row.step_byte_size,
     sha256: row.step_sha256,
   };

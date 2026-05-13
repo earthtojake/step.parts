@@ -1,18 +1,19 @@
 # Agent Guide
 
-This repo is a Next.js catalog for open-source CAD parts. The source of truth is STEP files plus human-authored catalog metadata; GLB previews, PNG thumbnails, and the SQLite catalog are generated artifacts.
+This repo is a Next.js catalog for open-source CAD parts. The source of truth is STEP files plus human-authored catalog metadata; GLB previews, PNG thumbnails, and the SQLite catalog are generated artifacts. Generated previews are published to Vercel Blob rather than committed.
 
 ## Quick Commands
 
 - Dev server: `npm run dev`
 - Catalog SQLite metadata only: `node scripts/generate-catalog.mjs`
 - Catalog build: `npm run catalog:build`
+- Preview asset sync: `npm run catalog:sync-assets`
 - Non-mutating catalog validation: `npm run catalog:check`
 - Lint: `npm run lint`
 - TypeScript check: `npx tsc --noEmit`
 - Full app check: `npm run check`
 
-`npm run catalog:build` refreshes stale GLB/PNG artifacts and `catalog/parts.sqlite`. It uses SQLite build hashes, not mtimes, to skip current assets. Each selected STEP part is processed as a GLB/PNG pair, then its complete SQLite row is upserted immediately. Pass `--force-build` to rebuild selected pairs even when they are current, and `--targets` to build specific target files. Tune paired export lanes with `STEP_PARTS_EXPORT_CONCURRENCY`; it defaults to 2.
+`npm run catalog:build` rebuilds local GLB/PNG preview artifacts only; it does not update `catalog/parts.sqlite`. Preview Blob paths are derived from each part's STEP SHA-256, so SQLite is reproducible from source catalog metadata plus STEP files. Tune paired export lanes with `STEP_PARTS_EXPORT_CONCURRENCY`; it defaults to 2. Production `npm run catalog:sync-assets` uploads only missing deterministic Blob assets and generates local GLB/PNG files only for those missing parts.
 
 For metadata-only changes to `catalog/parts.json`, do not run `npm run catalog:build`. Run `node scripts/generate-catalog.mjs` instead to refresh `catalog/parts.sqlite` without rebuilding GLB/PNG artifacts. Only run `catalog:build` when STEP files or preview assets need to be added, refreshed, or repaired.
 
@@ -21,21 +22,21 @@ The thumbnail exporter starts a local render server on `127.0.0.1`; sandboxed ru
 ## Repo Shape
 
 - `catalog/parts.json`: human-authored part records only.
-- `catalog/parts.sqlite`: generated catalog metadata and asset build state used by the app and incremental build.
+- `catalog/parts.sqlite`: generated catalog metadata used by the app.
 - `catalog/taxonomy.json`: narrow guardrails for rigid, repeatable families only.
 - `catalog/step/{id}.step`: canonical STEP assets.
-- `public/glb/{id}.glb`: generated interactive previews.
-- `public/png/{id}.png`: generated 512x512 thumbnails.
+- `public/glb/{id}.glb`: local generated interactive previews, ignored by Git and synced to Vercel Blob.
+- `public/png/{id}.png`: local generated 512x512 thumbnails, ignored by Git and synced to Vercel Blob.
 - `scripts/add-part.mjs`: single-part helper for local STEP files.
 - `scripts/generate-catalog.mjs`: regenerates catalog SQLite metadata only.
-- `scripts/export-assets.mjs`: converts STEP to GLB, renders PNGs, and refreshes generated catalog metadata.
-- `scripts/check-catalog.mjs`: validates source schema, taxonomy guardrails, generated SQLite rows, and assets.
+- `scripts/export-assets.mjs`: converts STEP to GLB and renders PNGs.
+- `scripts/check-catalog.mjs`: validates source schema, taxonomy guardrails, STEP sanity, generated SQLite rows, and optionally published Blob assets.
 - `src/components/part-directory.tsx`: searchable catalog UI and card previews.
 - `src/components/part-viewer.tsx`: detail-page 3D viewer with PNG fallback.
 - `src/lib/part-query.ts`: server-side search/filter/sort behavior.
 - `src/app/v1/*`: catalog API routes.
 
-STEP/STP, GLB, and PNG files are Git LFS assets via `.gitattributes`.
+STEP/STP files in `catalog/step` are Git LFS assets via `.gitattributes`. GLB/PNG previews are Vercel Blob assets and should not be committed.
 
 Local development and catalog validation serve STEP files from `catalog/step` through `/step/{id}.step`, so local downloads match the SQLite byte sizes and hashes. Production API `stepUrl` values and single-download redirects use commit-pinned GitHub LFS media URLs by default; set `STEP_PARTS_GITHUB_REF`, `STEP_PARTS_GITHUB_REPOSITORY`, or `STEP_PARTS_GITHUB_OWNER` plus `STEP_PARTS_GITHUB_REPO` to override the GitHub target.
 
@@ -119,7 +120,6 @@ Review all of these:
 
 - New records in `catalog/parts.json`.
 - New canonical STEP files in `catalog/step/`.
-- Generated GLB/PNG files in `public/glb/` and `public/png/`.
 - Regenerated `catalog/parts.sqlite`.
 
 Run:
@@ -157,11 +157,13 @@ For frontend work, avoid landing-page-style redesigns. This is a utilitarian cat
 
 ## Verification Notes
 
-`npm run catalog:check` is the fastest high-signal check for part additions because it verifies source schema, taxonomy guardrails for rigid families, SQLite freshness, STEP sanity, GLB validity, and 512x512 PNG metadata.
+`npm run catalog:check` is the fastest high-signal check for part additions because it verifies source schema, taxonomy guardrails for rigid families, SQLite freshness, and STEP sanity without requiring local preview files or Blob credentials.
 
-For metadata-only changes, prefer `node scripts/generate-catalog.mjs` plus `npm run lint` and `npx tsc --noEmit`. If `npm run catalog:check` fails only because unrelated GLB/PNG artifacts are missing, report that separately instead of running `npm run catalog:build` unless the user explicitly wants asset repair.
+GitHub Actions and Vercel deployments intentionally do not download Git LFS objects for now. CI runs the lighter `npm run check:ci` app gate, so full STEP-content validation and preview generation must be run manually/local before trusting catalog changes.
 
-`npm run catalog:build` skips generated assets that are already up to date, but can still be slow for large changed STEP files. GLB and PNG generation are paired per part, and paired export concurrency is configurable:
+For metadata-only changes, prefer `node scripts/generate-catalog.mjs` plus `npm run lint` and `npx tsc --noEmit`.
+
+`npm run catalog:build` can be slow for large changed STEP files. GLB and PNG generation is paired per part, and paired export concurrency is configurable:
 
 ```bash
 STEP_PARTS_EXPORT_CONCURRENCY=2 npm run catalog:build
