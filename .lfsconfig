@@ -1,0 +1,3 @@
+[lfs]
+	fetchinclude = public/glb/**,public/png/**,catalog/parts.sqlite
+	fetchexclude = catalog/step/**

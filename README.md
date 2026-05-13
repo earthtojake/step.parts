@@ -1,6 +1,12 @@
+<p align="center">
+  <img alt="step.parts social preview" src="public/step-parts-social-preview.png" width="720">
+</p>
+
 <h1 align="center">🔩 step.parts 🔩</h1>
 
-[Open](https://www.step.parts)
+<p align="center">
+  <a href="https://www.step.parts">Open</a>
+</p>
 
 <p align="center">
   <a href="https://nextjs.org/"><img alt="Next.js" src="https://img.shields.io/badge/Next.js-16.2.6-000000?logo=nextdotjs&amp;logoColor=white"></a>
