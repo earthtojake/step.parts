@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ComponentType, type FocusEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { track } from "@vercel/analytics";
 import {
   Check,
@@ -129,7 +129,7 @@ function buildQueryString(filters: PartQueryFilters, page: number, pageSize: num
   return params.toString();
 }
 
-function replaceDirectoryUrl(pathname: string, queryString: string, replaceUrl: (url: string) => void) {
+function replaceDirectoryUrl(pathname: string, queryString: string) {
   const params = new URLSearchParams(window.location.search);
   for (const key of DIRECTORY_QUERY_KEYS) {
     params.delete(key);
@@ -146,7 +146,7 @@ function replaceDirectoryUrl(pathname: string, queryString: string, replaceUrl: 
   const currentUrl = `${window.location.pathname}${window.location.search}${hash}`;
 
   if (nextUrl !== currentUrl) {
-    replaceUrl(nextUrl);
+    window.history.replaceState(null, "", nextUrl);
   }
 }
 
@@ -587,7 +587,6 @@ function Pagination({
 
 export function PartDirectory({ initialResult }: PartDirectoryProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const didMountRef = useRef(false);
   const [result, setResult] = useState(initialResult);
   const [filters, setFilters] = useState<PartQueryFilters>(initialResult.filters);
@@ -631,8 +630,8 @@ export function PartDirectory({ initialResult }: PartDirectoryProps) {
   }, [commitQuery, filters.q, searchInput]);
 
   useEffect(() => {
-    replaceDirectoryUrl(pathname, queryString, (nextUrl) => router.replace(nextUrl, { scroll: false }));
-  }, [pathname, queryString, router]);
+    replaceDirectoryUrl(pathname, queryString);
+  }, [pathname, queryString]);
 
   useEffect(() => {
     if (!didMountRef.current) {

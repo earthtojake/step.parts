@@ -7,6 +7,7 @@ import {
   DEFAULT_PART_PAGE_SIZE,
   MAX_PART_PAGE_SIZE,
 } from "@/lib/part-query-constants";
+import { rankedCandidatePageIds, type CandidateOrderRow } from "@/lib/part-ranking";
 import { getAllPartDownloadCounts } from "@/lib/part-stats";
 import type { PartFacet, PartQueryFilters, PartQueryResult } from "@/types/part-query";
 
@@ -232,40 +233,50 @@ function selectRowsBySourceOrder(
     .all(...where.params, limit, offset) as CatalogDbRow[];
 }
 
-function sqlString(value: string) {
-  return `'${value.replaceAll("'", "''")}'`;
+function selectCandidateOrderRows(db: DatabaseSync, where: { sql: string; params: unknown[] }) {
+  const rows = db
+    .prepare(`SELECT id, source_order AS sourceOrder FROM parts ${where.sql} ORDER BY source_order`)
+    .all(...where.params) as CandidateOrderRow[];
+
+  return rows;
+}
+
+function selectRowsByIds(db: DatabaseSync, ids: string[]) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const idOrder = new Map(ids.map((id, index) => [id, index]));
+  const rows = db
+    .prepare(`SELECT * FROM parts WHERE id IN (${placeholders(ids)})`)
+    .all(...ids) as CatalogDbRow[];
+
+  return rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 }
 
 function selectRowsByDownloadRank(
   db: DatabaseSync,
   where: { sql: string; params: unknown[] },
   downloadCounts: Map<string, number>,
-  limit: number,
-  offset: number,
+  pageSize: number,
+  start: number,
 ) {
-  const values = Array.from(downloadCounts)
-    .filter(([, count]) => count > 0)
-    .map(([id, count]) => `(${sqlString(id)}, ${count})`)
-    .join(", ");
+  const candidates = selectCandidateOrderRows(db, where);
+  const pageIds = rankedCandidatePageIds(candidates, downloadCounts, start, pageSize);
+  return selectRowsByIds(db, pageIds);
+}
 
-  if (!values) {
-    return selectRowsBySourceOrder(db, where, limit, offset);
+function maybeLogQueryTiming(startedAt: number, total: number, rows: number) {
+  if (process.env.NODE_ENV !== "development" || process.env.STEP_PARTS_QUERY_TIMING !== "1") {
+    return;
   }
 
-  return db
-    .prepare(
-      `WITH download_counts(id, download_count) AS (VALUES ${values})
-       SELECT parts.*
-       FROM parts
-       LEFT JOIN download_counts ON download_counts.id = parts.id
-       ${where.sql}
-       ORDER BY COALESCE(download_counts.download_count, 0) DESC, parts.source_order
-       LIMIT ? OFFSET ?`,
-    )
-    .all(...where.params, limit, offset) as CatalogDbRow[];
+  const elapsedMs = Math.round((performance.now() - startedAt) * 10) / 10;
+  console.info(`[step.parts] queryParts total=${total} rows=${rows} elapsedMs=${elapsedMs}`);
 }
 
 export async function queryParts(input: PartQueryInput): Promise<PartQueryResult> {
+  const startedAt = performance.now();
   const filters = parseFilters(input);
   const pageSize = parsePageSize(input);
   const requestedPage = parsePage(input);
@@ -286,6 +297,7 @@ export async function queryParts(input: PartQueryInput): Promise<PartQueryResult
       : selectRowsByDownloadRank(db, where, downloadCounts, pageSize, start);
   const pagedParts = rows.map(partFromCatalogRow);
   const facets = buildFilterFacets(db, filters);
+  maybeLogQueryTiming(startedAt, total, rows.length);
 
   return {
     catalog,
