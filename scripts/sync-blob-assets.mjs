@@ -1,9 +1,10 @@
 import dns from "node:dns";
-import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { execFile, spawn } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { parseArgs } from "node:util";
+import { parseArgs, promisify } from "node:util";
 import "./load-env.mjs";
 import { list, put } from "@vercel/blob";
 
@@ -18,15 +19,18 @@ import {
   normalizeBlobBaseUrl,
 } from "./blob-assets.mjs";
 import {
+  stepPathFor,
   glbPathFor,
   pngPathFor,
   readCatalogRows,
 } from "./catalog-utils.mjs";
 
+const execFileAsync = promisify(execFile);
 const DEFAULT_CONCURRENCY = 4;
 const MULTIPART_ASSET_BYTES = 4 * 1024 * 1024;
 const DEFAULT_UPLOAD_TIMEOUT_MS = 300_000;
 const DEFAULT_UPLOAD_ATTEMPTS = 3;
+const LFS_PATH_CHUNK_SIZE = 100;
 
 const { values } = parseArgs({
   allowPositionals: false,
@@ -139,6 +143,143 @@ function runNodeScript(scriptPath, scriptArgs = []) {
 
 function uniquePartIds(assets) {
   return Array.from(new Set(assets.map((asset) => asset.id))).sort((a, b) => a.localeCompare(b));
+}
+
+function stepRepoPath(row) {
+  return `catalog/step/${row.id}.step`;
+}
+
+function chunkArray(items, size) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function runCommand(command, args) {
+  try {
+    const { stdout } = await execFileAsync(command, args, {
+      cwd: process.cwd(),
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return stdout;
+  } catch (error) {
+    const stderr = typeof error.stderr === "string" ? error.stderr.trim() : "";
+    throw new Error(stderr || error.message);
+  }
+}
+
+function conciseCommandError(error) {
+  const message = String(error?.message ?? error);
+  return message.split(/\r?\n/).slice(0, 8).join("\n");
+}
+
+async function isHydratedStepFile(row) {
+  try {
+    const bytes = await readFile(stepPathFor(row));
+    return (
+      bytes.byteLength === row.step_byte_size &&
+      createHash("sha256").update(bytes).digest("hex") === row.step_sha256
+    );
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function fetchAndCheckoutLfsPaths(filePaths) {
+  await runCommand("git", ["lfs", "install", "--local"]);
+  for (const chunk of chunkArray(filePaths, LFS_PATH_CHUNK_SIZE)) {
+    const include = chunk.join(",");
+    await runCommand("git", ["lfs", "fetch", "--include", include, "--exclude", "", "origin", "HEAD"]);
+    await runCommand("git", ["lfs", "checkout", ...chunk]);
+  }
+}
+
+function encodeGithubPath(filePath) {
+  return filePath.split("/").map((part) => encodeURIComponent(part)).join("/");
+}
+
+async function downloadGithubMediaStepFiles(rows) {
+  const repository = process.env.GITHUB_REPOSITORY;
+  if (!repository || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    throw new Error("GITHUB_REPOSITORY is required for GitHub media STEP hydration fallback");
+  }
+
+  const ref = process.env.GITHUB_SHA || (await runCommand("git", ["rev-parse", "HEAD"])).trim();
+  const headers = {};
+  if (process.env.GITHUB_TOKEN) {
+    headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  for (const row of rows) {
+    const filePath = stepRepoPath(row);
+    const url = `https://media.githubusercontent.com/media/${repository}/${encodeURIComponent(ref)}/${encodeGithubPath(filePath)}`;
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      throw new Error(`${filePath}: GitHub media download failed with ${response.status} ${response.statusText}`);
+    }
+    await writeFile(stepPathFor(row), Buffer.from(await response.arrayBuffer()));
+  }
+}
+
+async function hydrateStepFilesForMissingAssets(missingAssets, rows, options) {
+  if (missingAssets.length === 0 || options.dryRun || options.verifyOnly) {
+    return;
+  }
+
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  const targetRows = uniquePartIds(missingAssets).map((id) => rowsById.get(id));
+  const missingRows = [];
+
+  for (const row of targetRows) {
+    if (!(await isHydratedStepFile(row))) {
+      missingRows.push(row);
+    }
+  }
+
+  if (missingRows.length === 0) {
+    return;
+  }
+
+  console.log(`Hydrating ${missingRows.length} STEP file${missingRows.length === 1 ? "" : "s"} for missing preview assets.`);
+  const errors = [];
+  try {
+    await fetchAndCheckoutLfsPaths(missingRows.map((row) => stepRepoPath(row)));
+  } catch (error) {
+    errors.push(`git lfs: ${conciseCommandError(error)}`);
+  }
+
+  let stillMissing = [];
+  for (const row of missingRows) {
+    if (!(await isHydratedStepFile(row))) {
+      stillMissing.push(row);
+    }
+  }
+  if (stillMissing.length === 0) {
+    return;
+  }
+
+  try {
+    await downloadGithubMediaStepFiles(stillMissing);
+  } catch (error) {
+    errors.push(`GitHub media: ${conciseCommandError(error)}`);
+  }
+
+  stillMissing = [];
+  for (const row of missingRows) {
+    if (!(await isHydratedStepFile(row))) {
+      stillMissing.push(row);
+    }
+  }
+  if (stillMissing.length === 0) {
+    return;
+  }
+
+  throw new Error(`Unable to hydrate ${stillMissing.length} STEP file(s) for preview asset generation:\n${errors.join("\n")}`);
 }
 
 async function buildMissingLocalAssets(missingAssets, options) {
@@ -281,6 +422,10 @@ async function main() {
 
   console.log(`Syncing ${assets.length} preview assets for ${rows.length} catalog parts.`);
   console.log(`Found ${existing.size} existing Blob objects under ${BLOB_ASSET_PREFIX}/.`);
+  await hydrateStepFilesForMissingAssets(missingAssets, rows, {
+    dryRun: Boolean(values["dry-run"]),
+    verifyOnly: Boolean(values["verify-only"]),
+  });
   await buildMissingLocalAssets(missingAssets, {
     dryRun: Boolean(values["dry-run"]),
     verifyOnly: Boolean(values["verify-only"]),
