@@ -1,5 +1,6 @@
 "use client";
 
+import { BrainCog } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export function SiteHeaderActions() {
           rel="noreferrer"
           aria-label="Open CAD Skills"
         >
+          <BrainCog aria-hidden="true" className="size-4" />
           Skills
         </a>
       </Button>
@@ -46,15 +48,16 @@ export function SiteHeaderActions() {
             asChild
             variant="outline"
             size="icon"
-            className="h-10 w-10 rounded-md"
+            className="h-10 w-10 gap-2 rounded-md px-0 md:w-auto md:px-3"
           >
             <a
               href="https://github.com/earthtojake/step.parts"
               target="_blank"
               rel="noreferrer"
-              aria-label="Open step.parts on GitHub"
+              aria-label="Contribute on GitHub"
             >
               <GitHubLogo className="size-4" />
+              <span className="hidden md:inline">Contribute</span>
             </a>
           </Button>
         </TooltipTrigger>

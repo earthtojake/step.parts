@@ -1,4 +1,8 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 export const BLOB_BASE_URL_ENV = "STEP_PARTS_BLOB_BASE_URL";
+const DEFAULT_PUBLIC_BLOB_BASE_URL = "https://8ljrorjug0ps5al0.public.blob.vercel-storage.com";
 
 type BlobAssetKind = "glb" | "png";
 
@@ -38,16 +42,33 @@ function localPreviewUrl(kind: BlobAssetKind, id: string) {
   return `/${kind}/${id}.${extension}`;
 }
 
+function localPreviewPath(kind: BlobAssetKind, id: string) {
+  const { extension } = ASSET_CONFIG[kind];
+  return path.join(process.cwd(), "public", kind, `${id}.${extension}`);
+}
+
+function localPreviewAssetsEnabled() {
+  return process.env.NODE_ENV === "development";
+}
+
+function fallbackBlobBaseUrl() {
+  return localPreviewAssetsEnabled() ? DEFAULT_PUBLIC_BLOB_BASE_URL : undefined;
+}
+
 export function blobAssetUrl(kind: BlobAssetKind, id: string, stepSha256: string) {
-  const base = normalizeBlobBaseUrl(process.env[BLOB_BASE_URL_ENV]);
+  const base = normalizeBlobBaseUrl(process.env[BLOB_BASE_URL_ENV] ?? fallbackBlobBaseUrl());
 
-  if (!base) {
-    if (process.env.VERCEL_ENV === "production") {
-      throw new Error(`${BLOB_BASE_URL_ENV} is required in production to serve ${kind.toUpperCase()} preview assets`);
-    }
-
+  if (localPreviewAssetsEnabled() && existsSync(localPreviewPath(kind, id))) {
     return localPreviewUrl(kind, id);
   }
 
-  return new URL(blobAssetPath(kind, id, stepSha256), `${base}/`).toString();
+  if (base) {
+    return new URL(blobAssetPath(kind, id, stepSha256), `${base}/`).toString();
+  }
+
+  if (process.env.VERCEL_ENV === "production") {
+    throw new Error(`${BLOB_BASE_URL_ENV} is required in production to serve ${kind.toUpperCase()} preview assets`);
+  }
+
+  return localPreviewUrl(kind, id);
 }

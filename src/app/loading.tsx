@@ -1,8 +1,9 @@
 import { Search } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DEFAULT_PART_PAGE_SIZE } from "@/lib/part-query-constants";
 
-const cards = Array.from({ length: 12 });
+const cards = Array.from({ length: DEFAULT_PART_PAGE_SIZE });
 
 function HeaderSkeleton() {
   return (

@@ -95,7 +95,7 @@ npm run catalog:check
 
 ## Preview Assets
 
-The app serves GLB and PNG preview URLs directly from Vercel Blob. Local catalog builds still write generated previews to `public/glb/` and `public/png/`, but those directories are ignored and should not be committed.
+The app serves GLB and PNG preview URLs from Vercel Blob. In local dev, generated previews in `public/glb/` and `public/png/` take priority when present; missing local preview files fall back to the public step.parts Blob origin by default. Set `STEP_PARTS_BLOB_BASE_URL` locally only when you need to override that origin. The local preview directories are ignored and should not be committed.
 
 After rebuilding previews, publish them to Blob:
 
