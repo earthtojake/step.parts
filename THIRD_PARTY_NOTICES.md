@@ -25,6 +25,9 @@ Adding headers, changing dimensions, extending length/size, or generating varian
 | Original project material not based on third-party STEP/model geometry | MIT License |
 | KiCad-derived STEP files and generated variants | `CC-BY-SA-4.0 WITH KiCad-libraries-exception` |
 | FreeCAD-library-derived STEP files and generated variants | `CC-BY-3.0` |
+| Adafruit CAD Parts-derived STEP files | `MIT` |
+| SparkFun KiCad Libraries-derived STEP files | `CC-BY-4.0` |
+| SparkFun 3D Models-derived STEP files | `CC-BY-SA-4.0` |
 | Files derived from multiple third-party model sources | Subject to all applicable source licenses; see the file-level attribution record |
 
 The top-level MIT License applies only to original project material. It does not relicense KiCad-derived or FreeCAD-library-derived STEP/model files.
@@ -154,6 +157,139 @@ CC-BY-3.0
 They are not distributed solely under the MIT License.
 
 No endorsement by FreeCAD, the FreeCAD project, FreeCAD-library maintainers, or FreeCAD-library contributors is implied.
+
+## Adafruit CAD Parts-derived STEP files
+
+Some STEP files in this repository were downloaded from, modified from, adapted from, or generated using files from Adafruit CAD Parts.
+
+Upstream source:
+
+```text
+Adafruit CAD Parts
+https://github.com/adafruit/Adafruit_CAD_Parts
+```
+
+Applicable license:
+
+```text
+MIT License
+```
+
+SPDX expression:
+
+```text
+MIT
+```
+
+License references:
+
+```text
+https://github.com/adafruit/Adafruit_CAD_Parts/blob/main/LICENSE
+```
+
+### Adafruit attribution
+
+Adafruit CAD Parts-derived files are attributed to Adafruit Industries and the Adafruit CAD Parts contributors.
+
+Where practical, each Adafruit-derived catalog entry identifies:
+
+- the original Adafruit source file or source path through the `stepSource` URL;
+- the original Adafruit repository URL and pinned commit;
+- the original license;
+- whether the file was copied, modified, converted, normalized, renamed, or generated as a variant; and
+- the applicable SPDX license expression.
+
+No endorsement by Adafruit Industries or Adafruit CAD Parts contributors is implied.
+
+## SparkFun KiCad Libraries-derived STEP files
+
+Some STEP files in this repository were downloaded from, modified from, adapted from, or generated using files from SparkFun KiCad Libraries.
+
+Upstream source:
+
+```text
+SparkFun KiCad Libraries
+https://github.com/sparkfun/SparkFun-KiCad-Libraries
+```
+
+Applicable license:
+
+```text
+Creative Commons Attribution 4.0 International
+```
+
+SPDX expression:
+
+```text
+CC-BY-4.0
+```
+
+License references:
+
+```text
+https://github.com/sparkfun/SparkFun-KiCad-Libraries/blob/main/README.md
+https://creativecommons.org/licenses/by/4.0/legalcode
+```
+
+### SparkFun KiCad Libraries attribution
+
+SparkFun KiCad Libraries-derived files are attributed to SparkFun Electronics and the SparkFun KiCad Libraries contributors.
+
+Where practical, each SparkFun KiCad Libraries-derived catalog entry identifies:
+
+- the original SparkFun source file or source path through the `stepSource` URL;
+- the original SparkFun repository URL and pinned commit;
+- the original license;
+- whether the file was copied, modified, converted, normalized, renamed, or generated as a variant; and
+- the applicable SPDX license expression.
+
+No endorsement by SparkFun Electronics or SparkFun KiCad Libraries contributors is implied.
+
+## SparkFun 3D Models-derived STEP files
+
+Some STEP files in this repository were downloaded from, modified from, adapted from, or generated using files from SparkFun 3D Models.
+
+Upstream source:
+
+```text
+SparkFun 3D Models
+https://github.com/sparkfun/3D_Models
+```
+
+Applicable license:
+
+```text
+Creative Commons Attribution-ShareAlike 4.0 International
+```
+
+SPDX expression:
+
+```text
+CC-BY-SA-4.0
+```
+
+License references:
+
+```text
+https://github.com/sparkfun/3D_Models/blob/main/LICENSE.md
+https://creativecommons.org/licenses/by-sa/4.0/legalcode
+```
+
+### SparkFun 3D Models attribution
+
+SparkFun 3D Models-derived files are attributed to SparkFun Electronics and the SparkFun 3D Models contributors.
+
+Where practical, each SparkFun 3D Models-derived catalog entry identifies:
+
+- the original SparkFun source file or source path through the `stepSource` URL;
+- the original SparkFun repository URL and pinned commit;
+- the original license;
+- whether the file was copied, modified, converted, normalized, renamed, or generated as a variant; and
+- the applicable SPDX license expression.
+
+Files derived from SparkFun 3D Models are share-alike assets. They are not distributed solely under the MIT License.
+
+No endorsement by SparkFun Electronics or SparkFun 3D Models contributors is implied.
 
 ## File-level attribution record
 
