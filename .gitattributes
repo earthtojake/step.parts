@@ -1,0 +1,2 @@
+catalog/step/*.step filter=lfs diff=lfs merge=lfs -text
+catalog/step/*.stp filter=lfs diff=lfs merge=lfs -text
