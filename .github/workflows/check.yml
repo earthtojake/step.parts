@@ -2,14 +2,20 @@ name: Check
 
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   check:
     runs-on: ubuntu-latest
     env:
       STEP_PARTS_BLOB_BASE_URL: ${{ vars.STEP_PARTS_BLOB_BASE_URL }}
+      STEP_PARTS_CI_MAX_CHANGED_STEPS: "200"
     steps:
       - uses: actions/checkout@v4
         with:
