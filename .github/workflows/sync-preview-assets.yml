@@ -1,0 +1,36 @@
+name: Sync Preview Assets
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-preview-assets-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+      STEP_PARTS_BLOB_BASE_URL: ${{ vars.STEP_PARTS_BLOB_BASE_URL }}
+      STEP_PARTS_EXPORT_CONCURRENCY: "2"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run catalog:sync-assets
+      - run: npm run catalog:check:published
