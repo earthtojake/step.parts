@@ -159,7 +159,7 @@ For frontend work, avoid landing-page-style redesigns. This is a utilitarian cat
 
 `npm run catalog:check` is the fastest high-signal check for part additions because it verifies source schema, taxonomy guardrails for rigid families, SQLite freshness, and STEP sanity without requiring local preview files or Blob credentials.
 
-GitHub Actions pull request and merge-queue checks intentionally do not download Git LFS objects. They run the lighter `npm run check:ci` app gate, which validates catalog metadata against committed LFS pointers without hydrating STEP content. Pushes to `main` run `npm run check:ci:step-content`, which hydrates and validates changed STEP files so deeper failures can be fixed by an admin follow-up. Full local validation and preview generation should still be run manually/local before trusting broad catalog changes.
+GitHub Actions pull request and merge-queue checks intentionally do not download Git LFS objects. They run the lighter `npm run check:pr` app gate, which validates catalog metadata against committed LFS pointers without hydrating STEP content. Pushes to `main` run `npm run check:main`, which hydrates and validates changed STEP files so deeper failures can be fixed by an admin follow-up. Full local validation and preview generation should still be run manually/local before trusting broad catalog changes.
 
 For metadata-only changes, prefer `node scripts/generate-catalog.mjs` plus `npm run lint` and `npx tsc --noEmit`.
 

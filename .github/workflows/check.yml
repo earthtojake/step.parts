@@ -28,8 +28,8 @@ jobs:
       - run: npm ci
       - name: Run PR checks without STEP hydration
         if: github.event_name != 'push'
-        run: npm run check:ci
+        run: npm run check:pr
 
       - name: Run main checks with changed STEP validation
         if: github.event_name == 'push'
-        run: npm run check:ci:step-content
+        run: npm run check:main
