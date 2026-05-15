@@ -146,7 +146,7 @@ npm run check
 npm run hooks:install
 ```
 
-The pre-commit hook runs `npm run check:commit`, which verifies generated catalog/assets and linting without the slower production build. GitHub Actions intentionally runs `npm run check:ci` on pull requests and pushes to `main`; that CI gate skips LFS hydration and STEP-content catalog validation.
+The pre-commit hook runs `npm run check:commit`, which verifies generated catalog/assets and linting without the slower production build. GitHub Actions runs `npm run check:pr` on pull requests without LFS hydration, and `npm run check:main` on pushes to `main` with changed STEP-content validation.
 
 ## Git LFS And Vercel
 

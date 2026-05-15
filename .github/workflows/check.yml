@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       STEP_PARTS_BLOB_BASE_URL: ${{ vars.STEP_PARTS_BLOB_BASE_URL }}
-      STEP_PARTS_CI_MAX_CHANGED_STEPS: "200"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,4 +26,10 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run check:ci
+      - name: Run PR checks without STEP hydration
+        if: github.event_name != 'push'
+        run: npm run check:pr
+
+      - name: Run main checks with changed STEP validation
+        if: github.event_name == 'push'
+        run: npm run check:main
