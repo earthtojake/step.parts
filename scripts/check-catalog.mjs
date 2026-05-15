@@ -32,7 +32,6 @@ import {
 dns.setDefaultResultOrder("ipv4first");
 
 const execFileAsync = promisify(execFile);
-const DEFAULT_CI_MAX_CHANGED_STEPS = 100;
 const DEFAULT_CI_MAX_STEP_BYTES = 128 * 1024 * 1024;
 const DEFAULT_CI_MAX_TOTAL_STEP_BYTES = 512 * 1024 * 1024;
 
@@ -40,6 +39,7 @@ const { values } = parseArgs({
   allowPositionals: false,
   options: {
     ci: { type: "boolean" },
+    "ci-step-content": { type: "boolean" },
     "changed-step": { type: "string", multiple: true },
     "require-blob": { type: "boolean" },
   },
@@ -825,16 +825,33 @@ function readPositiveIntegerEnv(name, fallback) {
   return parsed;
 }
 
+function readOptionalPositiveIntegerEnv(name) {
+  const raw = process.env[name];
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+
+  return parsed;
+}
+
 function enforceCiTargetBudgets(targetParts, pointers) {
-  const maxChangedSteps = readPositiveIntegerEnv("STEP_PARTS_CI_MAX_CHANGED_STEPS", DEFAULT_CI_MAX_CHANGED_STEPS);
+  const maxChangedSteps = readOptionalPositiveIntegerEnv("STEP_PARTS_CI_MAX_CHANGED_STEPS");
   const maxStepBytes = readPositiveIntegerEnv("STEP_PARTS_CI_MAX_STEP_BYTES", DEFAULT_CI_MAX_STEP_BYTES);
   const maxTotalStepBytes = readPositiveIntegerEnv("STEP_PARTS_CI_MAX_TOTAL_STEP_BYTES", DEFAULT_CI_MAX_TOTAL_STEP_BYTES);
   const totalBytes = targetParts.reduce((sum, part) => sum + pointers.get(part.id).size, 0);
 
-  assert(
-    targetParts.length <= maxChangedSteps,
-    `CI STEP validation targets ${targetParts.length} files; limit is ${maxChangedSteps}`,
-  );
+  if (maxChangedSteps !== null) {
+    assert(
+      targetParts.length <= maxChangedSteps,
+      `CI STEP validation targets ${targetParts.length} files; limit is ${maxChangedSteps}`,
+    );
+  }
+
   assert(totalBytes <= maxTotalStepBytes, `CI STEP validation targets ${totalBytes} bytes; limit is ${maxTotalStepBytes}`);
 
   for (const part of targetParts) {
@@ -1020,12 +1037,15 @@ async function collect(label, task) {
 const sourceParts = await readSourceParts();
 const taxonomy = await readTaxonomy();
 const ciMode = Boolean(values.ci);
+const ciStepContentMode = ciMode && Boolean(values["ci-step-content"]);
 const expectedParts = [];
 const sourceMetadataParts = [];
 let ciBaseInfo = null;
 let ciStepPointers = new Map();
 let ciTargetParts = [];
 let ciStepHydrated = false;
+
+assert(!values["ci-step-content"] || ciMode, "--ci-step-content requires --ci");
 
 await collect("catalog/taxonomy.json", () => {
   validateTaxonomy(taxonomy);
@@ -1053,25 +1073,27 @@ if (ciMode) {
     ciStepPointers = await readStepPointers(sourceParts);
   });
 
-  await collect("CI STEP validation targets", async () => {
-    const { baseInfo, targetPaths } = await resolveCiTargetStepPaths(sourceParts);
-    ciBaseInfo = baseInfo;
+  if (ciStepContentMode) {
+    await collect("CI STEP validation targets", async () => {
+      const { baseInfo, targetPaths } = await resolveCiTargetStepPaths(sourceParts);
+      ciBaseInfo = baseInfo;
 
-    const sourcePartsById = new Map(sourceParts.map((part) => [part.id, part]));
-    const targetIds = new Set();
-    for (const filePath of targetPaths) {
-      const id = stepIdFromCatalogPath(filePath);
-      assert(id, `${filePath}: --changed-step must point at catalog/step/*.step or catalog/step/*.stp`);
-      assert(sourcePartsById.has(id), `${filePath}: changed STEP does not have a source catalog record`);
-      targetIds.add(id);
-    }
+      const sourcePartsById = new Map(sourceParts.map((part) => [part.id, part]));
+      const targetIds = new Set();
+      for (const filePath of targetPaths) {
+        const id = stepIdFromCatalogPath(filePath);
+        assert(id, `${filePath}: --changed-step must point at catalog/step/*.step or catalog/step/*.stp`);
+        assert(sourcePartsById.has(id), `${filePath}: changed STEP does not have a source catalog record`);
+        targetIds.add(id);
+      }
 
-    ciTargetParts = sourceParts.filter((part) => targetIds.has(part.id));
-    for (const part of ciTargetParts) {
-      assert(ciStepPointers.has(part.id), `${part.id}: missing Git LFS pointer`);
-    }
-    enforceCiTargetBudgets(ciTargetParts, ciStepPointers);
-  });
+      ciTargetParts = sourceParts.filter((part) => targetIds.has(part.id));
+      for (const part of ciTargetParts) {
+        assert(ciStepPointers.has(part.id), `${part.id}: missing Git LFS pointer`);
+      }
+      enforceCiTargetBudgets(ciTargetParts, ciStepPointers);
+    });
+  }
 } else {
   await collect("STEP metadata", async () => {
     const result = await checkStepMetadataForCatalogParts(sourceParts, { stepDir });
@@ -1111,7 +1133,7 @@ await collect("catalog/taxonomy.json identities", () => {
   validateTaxonomyIdentities(expectedParts, taxonomy);
 });
 
-if (ciMode && ciTargetParts.length > 0) {
+if (ciStepContentMode && ciTargetParts.length > 0) {
   await collect("CI STEP LFS hydration", async () => {
     await hydrateCiStepFiles(ciTargetParts, ciStepPointers, ciBaseInfo);
     ciStepHydrated = true;
