@@ -87,6 +87,22 @@ function invalidateDownloadCountsCache() {
   downloadCountsCache = null;
 }
 
+function refreshAllPartDownloadCounts(database: NeonSql): Promise<Map<string, number>> {
+  downloadCountsPromise ??= readAllPartDownloadCounts(database)
+    .then((counts) => {
+      downloadCountsCache = {
+        createdAt: Date.now(),
+        counts,
+      };
+      return counts;
+    })
+    .finally(() => {
+      downloadCountsPromise = null;
+    });
+
+  return downloadCountsPromise;
+}
+
 async function readAllPartDownloadCounts(database: NeonSql): Promise<Map<string, number>> {
   await ensureDownloadsTable(database);
 
@@ -112,23 +128,26 @@ export async function getAllPartDownloadCounts(): Promise<Map<string, number>> {
     return cloneCounts(downloadCountsCache.counts);
   }
 
-  downloadCountsPromise ??= readAllPartDownloadCounts(database)
-    .then((counts) => {
-      downloadCountsCache = {
-        createdAt: Date.now(),
-        counts,
-      };
-      return counts;
-    })
-    .finally(() => {
-      downloadCountsPromise = null;
-    });
-
   try {
-    return cloneCounts(await downloadCountsPromise);
+    return cloneCounts(await refreshAllPartDownloadCounts(database));
   } catch {
     return new Map();
   }
+}
+
+export function getCachedPartDownloadCounts(): Map<string, number> {
+  const database = getSql();
+
+  if (!database) {
+    return new Map();
+  }
+
+  const now = Date.now();
+  if (!downloadCountsCache || now - downloadCountsCache.createdAt >= DOWNLOAD_COUNTS_CACHE_TTL_MS) {
+    void refreshAllPartDownloadCounts(database).catch(() => undefined);
+  }
+
+  return cloneCounts(downloadCountsCache?.counts ?? new Map());
 }
 
 export async function getPartDownloadCounts(partIds: string[]): Promise<Map<string, number>> {

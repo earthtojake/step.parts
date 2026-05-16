@@ -24,7 +24,7 @@ import { StepDownloadLink } from "@/components/step-download-link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { stepFileName } from "@/lib/part-files";
-import { DEFAULT_PART_PAGE_SIZE } from "@/lib/part-query-constants";
+import { DEFAULT_PART_PAGE, DEFAULT_PART_PAGE_SIZE } from "@/lib/part-query-constants";
 import { cn } from "@/lib/utils";
 
 type PartDirectoryProps = {
@@ -50,7 +50,7 @@ const FACET_LABELS: Record<FacetKey, string> = {
 
 const FACET_ORDER: FacetKey[] = ["categories", "families", "standards", "tags"];
 const DEFAULT_VISIBLE_FACETS = 10;
-const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 200;
 const MAX_SELECTED_DOWNLOAD_PARTS = 50;
 const GRID_COLUMN_OPTIONS = [1, 2, 3, 4, 5] as const;
 const PAGE_SIZE_OPTIONS = [60, 120, 180].filter((pageSize) =>
@@ -94,6 +94,16 @@ function formatPartCount(count: number) {
 
 function hasSelectedFacetFilters(filters: PartQueryFilters) {
   return (Object.keys(QUERY_KEYS) as FacetKey[]).some((key) => filters[key].length > 0);
+}
+
+function emptyFilters(): PartQueryFilters {
+  return {
+    q: "",
+    tags: [],
+    categories: [],
+    families: [],
+    standards: [],
+  };
 }
 
 function hasSerializedDirectoryState(filters: PartQueryFilters, page: number, pageSize: number) {
@@ -648,7 +658,9 @@ export function PartDirectory({ initialResult }: PartDirectoryProps) {
     }
 
     const controller = new AbortController();
-    const timeout = window.setTimeout(async () => {
+    let cancelled = false;
+
+    const loadParts = async () => {
       setIsLoading(true);
       setError(null);
 
@@ -677,13 +689,17 @@ export function PartDirectory({ initialResult }: PartDirectoryProps) {
           setError("Could not load matching parts.");
         }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
-    }, 180);
+    };
+
+    void loadParts();
 
     return () => {
+      cancelled = true;
       controller.abort();
-      window.clearTimeout(timeout);
     };
   }, [filters.q, page, queryString, searchInput]);
 
@@ -711,15 +727,16 @@ export function PartDirectory({ initialResult }: PartDirectoryProps) {
 
   const clearAllFilters = () => {
     setSearchInput("");
-    setFilters({
-      q: "",
-      tags: [],
-      categories: [],
-      families: [],
-      standards: [],
-    });
-    setPage(1);
+    setFilters(emptyFilters());
+    setPage(DEFAULT_PART_PAGE);
   };
+
+  const resetDirectoryState = useCallback(() => {
+    setSearchInput("");
+    setFilters(emptyFilters());
+    setPage(DEFAULT_PART_PAGE);
+    setPageSize(DEFAULT_PART_PAGE_SIZE);
+  }, []);
 
   const togglePartSelection = useCallback((partId: string, isSelected: boolean) => {
     if (
@@ -810,7 +827,7 @@ export function PartDirectory({ initialResult }: PartDirectoryProps) {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-6 pt-8 sm:px-6 sm:pt-10 lg:px-8">
-      <SiteHeader />
+      <SiteHeader onBrandClick={resetDirectoryState} />
       <section className="flex flex-col gap-3 border-b border-border py-5" aria-label="Directory search">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative w-full sm:max-w-xl">

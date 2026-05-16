@@ -2,6 +2,7 @@
 
 import { BrainCog } from "lucide-react";
 import Link from "next/link";
+import type { MouseEvent } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,20 @@ function GitHubLogo({ className }: { className?: string }) {
     >
       <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.5-1.3-1.2-1.6-1.2-1.6-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.7 2.6 1.2 3.3.9.1-.7.4-1.2.7-1.5-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.2 11.2 0 0 1 6 0C17 4.7 18 5 18 5c.7 1.6.3 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z" />
     </svg>
+  );
+}
+
+type SiteHeaderProps = {
+  onBrandClick?: () => void;
+};
+
+function isPlainPrimaryClick(event: MouseEvent<HTMLAnchorElement>) {
+  return (
+    event.button === 0 &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey
   );
 }
 
@@ -68,10 +83,16 @@ export function SiteHeaderActions() {
   );
 }
 
-export function SiteHeader() {
+export function SiteHeader({ onBrandClick }: SiteHeaderProps) {
+  const handleBrandClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (onBrandClick && isPlainPrimaryClick(event)) {
+      onBrandClick();
+    }
+  };
+
   return (
     <header className="flex items-start justify-between gap-3 border-b border-border pb-6 sm:gap-4">
-      <Link href="/" className="min-w-0 focus:outline-none">
+      <Link href="/" className="min-w-0 focus:outline-none" onClick={handleBrandClick}>
         <p className="text-xs uppercase text-muted-foreground">Open Source CAD Directory</p>
         <div className="mt-2 flex min-w-0 items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}

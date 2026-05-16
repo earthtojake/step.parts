@@ -8,7 +8,7 @@ import {
   MAX_PART_PAGE_SIZE,
 } from "@/lib/part-query-constants";
 import { rankedCandidatePageIds, type CandidateOrderRow } from "@/lib/part-ranking";
-import { getAllPartDownloadCounts } from "@/lib/part-stats";
+import { getCachedPartDownloadCounts } from "@/lib/part-stats";
 import type { PartFacet, PartQueryFilters, PartQueryResult } from "@/types/part-query";
 
 export {
@@ -290,7 +290,7 @@ export async function queryParts(input: PartQueryInput): Promise<PartQueryResult
   const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
   const page = totalPages === 0 ? DEFAULT_PART_PAGE : Math.min(requestedPage, totalPages);
   const start = (page - 1) * pageSize;
-  const downloadCounts = await getAllPartDownloadCounts();
+  const downloadCounts = getCachedPartDownloadCounts();
   const rows =
     downloadCounts.size === 0
       ? selectRowsBySourceOrder(db, where, pageSize, start)
